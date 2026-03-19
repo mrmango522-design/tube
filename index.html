@@ -19,6 +19,7 @@
             flex-direction: column;
             align-items: center;
             user-select: none; /* 防止小學生狂按選取文字 */
+            -webkit-touch-callout: none; /* 禁用 iOS 長按選單 */
         }
 
         /* 頂部深啡色大標題區塊 */
@@ -86,7 +87,7 @@
         .learn-btn {
             color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold;
             padding: 15px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 0 rgba(0,0,0,0.2);
-            background-color: #f39c12;
+            background-color: #f39c12; touch-action: none; /* 禁用原生的觸控滑動操作 */
         }
         .learn-btn:active { transform: translateY(4px); box-shadow: 0 0 0 rgba(0,0,0,0.2); }
         .learn-btn:disabled { background-color: #bdc3c7; cursor: not-allowed; transform: none; box-shadow: none; }
@@ -121,7 +122,7 @@
         <div class="left-panel">
             <div id="loadingMsg">🔄 AI 模型載入中，請稍候...</div>
             <div id="camera-container">
-                <video id="webcam" autoplay playsinline muted></video>
+                <video id="webcam" width="400" height="300" autoplay playsinline muted></video>
             </div>
             <div class="cam-controls">
                 <button id="toggleBtn">▶ 開始辨認</button>
@@ -135,11 +136,11 @@
                 <option value="clear">🧹 清除模式 (只辨認 Class 3-4, 背景)</option>
             </select>
             
-            <button class="learn-btn" id="btn-class1" onmousedown="startLearning('Class 1')" onmouseup="stopLearning()" onmouseleave="stopLearning()">學習 Class 1 (渠管)</button>
-            <button class="learn-btn" id="btn-class2" onmousedown="startLearning('Class 2')" onmouseup="stopLearning()" onmouseleave="stopLearning()">學習 Class 2 (裂縫)</button>
-            <button class="learn-btn" id="btn-class3" onmousedown="startLearning('Class 3')" onmouseup="stopLearning()" onmouseleave="stopLearning()">學習 Class 3 (污泥)</button>
-            <button class="learn-btn" id="btn-class4" onmousedown="startLearning('Class 4')" onmouseup="stopLearning()" onmouseleave="stopLearning()">學習 Class 4 (樹葉)</button>
-            <button class="learn-btn" style="background-color:#34495e;" id="btn-bg" onmousedown="startLearning('Background')" onmouseup="stopLearning()" onmouseleave="stopLearning()">學習 背景</button>
+            <button class="learn-btn" id="btn-class1">學習 Class 1 (渠管)</button>
+            <button class="learn-btn" id="btn-class2">學習 Class 2 (裂縫)</button>
+            <button class="learn-btn" id="btn-class3">學習 Class 3 (污泥)</button>
+            <button class="learn-btn" id="btn-class4">學習 Class 4 (樹葉)</button>
+            <button class="learn-btn" id="btn-bg" style="background-color:#34495e;">學習 背景</button>
         </div>
     </div>
 
@@ -188,7 +189,7 @@
         let knn;
         let learnInterval;
         
-        // Microbit 通訊變數 (採用你提供的穩定寫法)
+        // Microbit 通訊變數
         let serialPort = null;
         let serialWriter = null;
         let lastSendTime = 0;
@@ -207,7 +208,6 @@
                     </tr>
                 `;
             });
-            // 初始禁用學習按鈕
             setLearnButtonsDisabled(true);
         }
         renderTable();
@@ -236,7 +236,63 @@
         });
         knn = ml5.KNNClassifier();
 
-        // === 2. 按鈕控制邏輯 ===
+        // === 2. 綁定按鈕學習事件 (解決觸控長按失效問題) ===
+        function attachLearningEvents(btnId, className) {
+            const btn = document.getElementById(btnId);
+            
+            const handleStart = (e) => {
+                e.preventDefault(); // 阻止反白文字或右鍵選單
+                if (!isModelReady) return;
+                
+                // 按下立刻學習第一張
+                addExample(className); 
+                
+                // 每 0.1 秒持續學習
+                clearInterval(learnInterval); 
+                learnInterval = setInterval(() => { addExample(className); }, 100);
+            };
+            
+            const handleStop = (e) => {
+                e.preventDefault();
+                clearInterval(learnInterval);
+            };
+
+            // 滑鼠事件 (電腦)
+            btn.addEventListener('mousedown', handleStart);
+            btn.addEventListener('mouseup', handleStop);
+            btn.addEventListener('mouseleave', handleStop);
+            
+            // 觸控事件 (平板/手機)
+            btn.addEventListener('touchstart', handleStart, {passive: false});
+            btn.addEventListener('touchend', handleStop, {passive: false});
+            btn.addEventListener('touchcancel', handleStop, {passive: false});
+        }
+
+        attachLearningEvents('btn-class1', 'Class 1');
+        attachLearningEvents('btn-class2', 'Class 2');
+        attachLearningEvents('btn-class3', 'Class 3');
+        attachLearningEvents('btn-class4', 'Class 4');
+        attachLearningEvents('btn-bg', 'Background');
+
+        // === 3. 核心學習功能 ===
+        function addExample(className) {
+            try {
+                // 確保影片畫面已經成功載入 (寬度大於0)
+                if (video.videoWidth === 0) return;
+                
+                // 提取影像特徵並加入 KNN
+                const features = featureExtractor.infer(video);
+                knn.addExample(features, className);
+                
+                // 更新數字
+                counts[className]++;
+                document.getElementById(`count-${className.replace(' ', '')}`).innerText = counts[className];
+            } catch (err) {
+                console.error("抓取影像學習時發生錯誤:", err);
+            }
+        }
+
+        // === 4. 辨認與模式邏輯 ===
         flipBtn.addEventListener('click', () => {
             isFlipped = !isFlipped;
             video.style.transform = isFlipped ? 'scaleX(-1)' : 'scaleX(1)';
@@ -244,7 +300,7 @@
 
         toggleBtn.addEventListener('click', () => {
             if (knn.getNumLabels() === 0) {
-                alert("請先長按右方的按鈕，為類別學習一些相片！");
+                alert("請先長按右方的黃色按鈕，為類別學習一些相片！");
                 return;
             }
             isRecognizing = !isRecognizing;
@@ -255,75 +311,58 @@
             } else {
                 toggleBtn.innerHTML = "▶ 開始辨認";
                 toggleBtn.classList.remove("stop");
-                // 歸零顯示
                 classes.forEach(c => updateConfidenceUI(c.id, 0));
             }
         });
 
-        // === 3. 學習功能 (長按連拍) ===
-        function addExample(className) {
-            if (!isModelReady) return;
-            const features = featureExtractor.infer(video);
-            knn.addExample(features, className);
-            counts[className]++;
-            document.getElementById(`count-${className.replace(' ', '')}`).innerText = counts[className];
-        }
-
-        function startLearning(className) {
-            if (!isModelReady) return;
-            addExample(className); // 按下立刻拍一張
-            learnInterval = setInterval(() => { addExample(className); }, 100); // 每 0.1 秒拍一張
-        }
-
-        function stopLearning() {
-            clearInterval(learnInterval);
-        }
-
-        // === 4. 辨認與模式邏輯 ===
         function classify() {
             if (!isRecognizing) return;
 
-            const features = featureExtractor.infer(video);
-            knn.classify(features, (err, result) => {
-                if (err) { console.error(err); return; }
+            try {
+                const features = featureExtractor.infer(video);
+                knn.classify(features, (err, result) => {
+                    if (err) { console.error(err); return; }
 
-                let currentConfidences = result.confidencesByLabel;
-                
-                // 更新畫面上的相似度
-                classes.forEach(c => {
-                    let conf = currentConfidences[c.id] ? (currentConfidences[c.id] * 100).toFixed(1) : 0;
-                    updateConfidenceUI(c.id, conf);
-                });
+                    let currentConfidences = result.confidencesByLabel;
+                    
+                    classes.forEach(c => {
+                        let conf = currentConfidences[c.id] ? (currentConfidences[c.id] * 100).toFixed(1) : 0;
+                        updateConfidenceUI(c.id, conf);
+                    });
 
-                // 根據模式篩選
-                const mode = document.getElementById('modeSelect').value;
-                let allowedClasses = mode === 'inspect' ? ['Class 1', 'Class 2'] : ['Class 3', 'Class 4', 'Background'];
-                
-                let bestClass = '';
-                let highestConf = 0;
+                    // 根據下拉選單模式篩選
+                    const mode = document.getElementById('modeSelect').value;
+                    let allowedClasses = mode === 'inspect' ? ['Class 1', 'Class 2'] : ['Class 3', 'Class 4', 'Background'];
+                    
+                    let bestClass = '';
+                    let highestConf = 0;
 
-                allowedClasses.forEach(c => {
-                    if (currentConfidences[c] && currentConfidences[c] > highestConf) {
-                        highestConf = currentConfidences[c];
-                        bestClass = c;
+                    allowedClasses.forEach(c => {
+                        if (currentConfidences[c] && currentConfidences[c] > highestConf) {
+                            highestConf = currentConfidences[c];
+                            bestClass = c;
+                        }
+                    });
+
+                    // 超過 50% 信心度，觸發傳送
+                    if (bestClass && highestConf > 0.5) {
+                        triggerMicrobit(bestClass);
                     }
+
+                    // 循環辨認
+                    setTimeout(classify, 150);
                 });
-
-                // 若超過 50% 信心度，觸發傳送
-                if (bestClass && highestConf > 0.5) {
-                    triggerMicrobit(bestClass);
-                }
-
-                // 循環辨認
-                setTimeout(classify, 150);
-            });
+            } catch (err) {
+                console.error("辨認時發生錯誤：", err);
+                setTimeout(classify, 500); // 出錯時延遲重試，防止當機
+            }
         }
 
         function updateConfidenceUI(className, value) {
             document.getElementById(`conf-${className.replace(' ', '')}`).innerText = `${value}%`;
         }
 
-        // === 5. Web Serial API 通訊 (沿用你的穩定寫法) ===
+        // === 5. Web Serial API 通訊 ===
         connectSerialBtn.addEventListener('click', async () => {
             if (!('serial' in navigator)) { alert("瀏覽器不支援 Web Serial API"); return; }
             try {
@@ -351,7 +390,7 @@
 
         function triggerMicrobit(className) {
             const now = Date.now();
-            if (now - lastSendTime < cooldownMs) return; // 冷卻機制
+            if (now - lastSendTime < cooldownMs) return;
 
             let cmd = "";
             if (className === 'Class 1') cmd = "R1";
