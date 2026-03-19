@@ -4,308 +4,298 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>護渠大師</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js"></script>
+    <script src="https://unpkg.com/ml5@0.4.3/dist/ml5.min.js"></script>
     <style>
-        :root {
-            --primary-color: #2c3e50;
-            --secondary-color: #3498db;
-            --accent-color: #e74c3c;
-            --bg-color: #ecf0f1;
-        }
+        /* 模仿設計圖的點狀背景與字體 */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--primary-color);
+            font-family: "Microsoft JhengHei", Arial, sans-serif;
             text-align: center;
+            background-color: #f5f0e6;
+            background-image: radial-gradient(#d3cabc 1px, transparent 1px);
+            background-size: 20px 20px;
             margin: 0;
+            padding: 30px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none; /* 防止小學生狂按選取文字 */
+        }
+
+        /* 頂部深啡色大標題區塊 */
+        .header-box {
+            background-color: #634739;
+            color: white;
+            width: 800px;
             padding: 20px;
-            user-select: none;
-        }
-        h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            color: var(--primary-color);
-        }
-        .control-panel {
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            align-items: center;
-        }
-        button, select {
-            padding: 12px 20px;
-            font-size: 1.1em;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            background-color: var(--secondary-color);
-            color: white;
-            font-weight: bold;
-            transition: 0.2s;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        button:hover, select:hover { background-color: #2980b9; }
-        button:active { transform: translateY(2px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        button:disabled { background-color: #95a5a6; cursor: not-allowed; transform: none; box-shadow: none; }
-        
-        #connectBtn { background-color: #27ae60; }
-        #connectBtn:hover { background-color: #2ecc71; }
-        #toggleRecognize { background-color: var(--accent-color); }
-        
-        .main-content {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-        .video-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background: white;
-            padding: 15px;
             border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            position: relative;
-        }
-        #loadingMsg {
-            color: #27ae60; 
-            font-weight: bold; 
-            font-size: 1.2em;
-            margin-bottom: 10px;
-        }
-        video {
-            background-color: #000;
-            border-radius: 8px;
-            transform: scaleX(1); 
-        }
-        .learning-panel {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
             display: flex;
-            flex-direction: column;
-            gap: 12px;
-            justify-content: center;
+            justify-content: space-between;
+            align-items: center;
         }
-        .learning-panel button {
-            background-color: #f39c12;
-            width: 220px;
+
+        .header-box h1 { margin: 0; font-size: 32px; letter-spacing: 2px; }
+
+        #connectSerialBtn {
+            background-color: #e67e22; color: white; border: none; padding: 10px 20px;
+            font-size: 16px; font-weight: bold; border-radius: 20px; cursor: pointer; transition: 0.3s;
         }
-        .learning-panel button:active { background-color: #e67e22; }
-        table {
-            margin: 30px auto;
-            border-collapse: collapse;
-            width: 80%;
-            max-width: 800px;
-            background: white;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            border-radius: 8px;
-            overflow: hidden;
-            margin-bottom: 60px;
+        #connectSerialBtn:hover { background-color: #d35400; }
+        #connectSerialBtn:disabled { background-color: #27ae60; cursor: default; }
+
+        /* 主畫面佈局：左邊鏡頭區，右邊按鈕區 */
+        .main-display {
+            display: flex; justify-content: center; align-items: flex-start; gap: 20px; margin-bottom: 20px;
         }
-        th, td { padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-size: 1.1em; }
-        th { background-color: var(--primary-color); color: white; }
+
+        /* 左側白色卡片 */
+        .left-panel {
+            background-color: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 440px;
+        }
+
+        #loadingMsg { color: #e74c3c; font-weight: bold; font-size: 16px; margin-bottom: 10px; }
+
+        /* 鏡頭外框 */
+        #camera-container {
+            border: 8px solid #73574b; border-radius: 4px; background-color: #000; margin-bottom: 15px; overflow: hidden;
+        }
+        video { display: block; width: 400px; height: 300px; object-fit: cover; transform: scaleX(1); transition: transform 0.3s;}
+
+        .cam-controls { display: flex; gap: 10px; margin-bottom: 15px; }
         
-        #statusBar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background-color: var(--primary-color);
-            color: white;
-            padding: 10px 0;
-            font-size: 1.2em;
-            font-weight: bold;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
-            z-index: 1000;
+        #toggleBtn {
+            background-color: #347b38; color: white; border: none; padding: 12px; font-size: 18px;
+            font-weight: bold; border-radius: 8px; cursor: pointer; flex: 1; transition: 0.3s;
         }
+        #toggleBtn.stop { background-color: #c0392b; }
+        
+        #flipBtn {
+            background-color: #7f8c8d; color: white; border: none; padding: 12px; font-size: 16px;
+            font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.3s;
+        }
+
+        /* 右側按鈕區 */
+        .side-panel { display: flex; flex-direction: column; gap: 10px; width: 280px; }
+
+        select {
+            padding: 12px; font-size: 16px; border-radius: 8px; border: 2px solid #bdc3c7;
+            font-weight: bold; color: #2c3e50; cursor: pointer; margin-bottom: 10px;
+        }
+
+        .learn-btn {
+            color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold;
+            padding: 15px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+            background-color: #f39c12;
+        }
+        .learn-btn:active { transform: translateY(4px); box-shadow: 0 0 0 rgba(0,0,0,0.2); }
+        .learn-btn:disabled { background-color: #bdc3c7; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* 表格與日誌區塊 */
+        .bottom-section { width: 800px; display: flex; flex-direction: column; gap: 15px; }
+
+        table {
+            width: 100%; border-collapse: collapse; background: white; border-radius: 8px;
+            overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        th, td { padding: 12px; border: 1px solid #ecf0f1; text-align: center; font-size: 16px; }
+        th { background-color: #634739; color: white; }
+        td { font-weight: bold; color: #2c3e50; }
+
+        .msg-log {
+            background-color: #fff; padding: 15px; border-radius: 8px; font-size: 16px;
+            color: #2c3e50; border: 2px solid #bdc3c7; text-align: left; font-weight: bold;
+        }
+        .msg-log span { color: #e67e22; font-size: 18px; }
+        .cooldown-text { float: right; color: #7f8c8d; font-size: 14px; }
     </style>
 </head>
 <body>
 
-    <h1>護渠大師</h1>
-    
-    <div class="control-panel">
-        <button id="connectBtn" onclick="connectSerial()">連接Microbit</button>
-        <select id="modeSelect">
-            <option value="inspect">檢視模式 (Class 1-2)</option>
-            <option value="clear">清除模式 (Class 3-4, 背景)</option>
-        </select>
+    <div class="header-box">
+        <h1>護渠大師</h1>
+        <button id="connectSerialBtn">◀ 連接 Micro:bit</button>
     </div>
 
-    <div class="control-panel">
-        <button id="toggleRecognize" onclick="toggleRecognition()" disabled>等待鏡頭準備...</button>
-        <button id="flipCamera" onclick="flipVideo()">水平翻轉影像</button>
-    </div>
-
-    <div class="main-content">
-        <div class="video-container">
-            <div id="loadingMsg">請允許瀏覽器使用相機 📷</div>
-            <video id="video" width="400" height="300" autoplay playsinline></video>
+    <div class="main-display">
+        <div class="left-panel">
+            <div id="loadingMsg">🔄 AI 模型載入中，請稍候...</div>
+            <div id="camera-container">
+                <video id="webcam" autoplay playsinline muted></video>
+            </div>
+            <div class="cam-controls">
+                <button id="toggleBtn">▶ 開始辨認</button>
+                <button id="flipBtn">↔ 水平翻轉</button>
+            </div>
         </div>
 
-        <div class="learning-panel">
-            <button onmousedown="startLearning('Class 1')" onmouseup="stopLearning()" onmouseleave="stopLearning()" ontouchstart="startLearning('Class 1')" ontouchend="stopLearning()">學習Class 1(渠管)</button>
-            <button onmousedown="startLearning('Class 2')" onmouseup="stopLearning()" onmouseleave="stopLearning()" ontouchstart="startLearning('Class 2')" ontouchend="stopLearning()">學習Class 2(裂縫)</button>
-            <button onmousedown="startLearning('Class 3')" onmouseup="stopLearning()" onmouseleave="stopLearning()" ontouchstart="startLearning('Class 3')" ontouchend="stopLearning()">學習Class 3(污泥)</button>
-            <button onmousedown="startLearning('Class 4')" onmouseup="stopLearning()" onmouseleave="stopLearning()" ontouchstart="startLearning('Class 4')" ontouchend="stopLearning()">學習Class 4(樹葉)</button>
-            <button onmousedown="startLearning('Background')" onmouseup="stopLearning()" onmouseleave="stopLearning()" ontouchstart="startLearning('Background')" ontouchend="stopLearning()">學習背景</button>
+        <div class="side-panel">
+            <select id="modeSelect">
+                <option value="inspect">🔍 檢視模式 (只辨認 Class 1-2)</option>
+                <option value="clear">🧹 清除模式 (只辨認 Class 3-4, 背景)</option>
+            </select>
+            
+            <button class="learn-btn" id="btn-class1" onmousedown="startLearning('Class 1')" onmouseup="stopLearning()" onmouseleave="stopLearning()">學習 Class 1 (渠管)</button>
+            <button class="learn-btn" id="btn-class2" onmousedown="startLearning('Class 2')" onmouseup="stopLearning()" onmouseleave="stopLearning()">學習 Class 2 (裂縫)</button>
+            <button class="learn-btn" id="btn-class3" onmousedown="startLearning('Class 3')" onmouseup="stopLearning()" onmouseleave="stopLearning()">學習 Class 3 (污泥)</button>
+            <button class="learn-btn" id="btn-class4" onmousedown="startLearning('Class 4')" onmouseup="stopLearning()" onmouseleave="stopLearning()">學習 Class 4 (樹葉)</button>
+            <button class="learn-btn" style="background-color:#34495e;" id="btn-bg" onmousedown="startLearning('Background')" onmouseup="stopLearning()" onmouseleave="stopLearning()">學習 背景</button>
         </div>
     </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>類別 (Class)</th>
-                <th>相似度 (%)</th>
-                <th>已學習相片數量</th>
-            </tr>
-        </thead>
-        <tbody id="statsBody">
-            </tbody>
-    </table>
+    <div class="bottom-section">
+        <table>
+            <thead>
+                <tr>
+                    <th>類別 (Class)</th>
+                    <th>相似度 (%)</th>
+                    <th>已學習相片數量</th>
+                </tr>
+            </thead>
+            <tbody id="statsBody">
+                </tbody>
+        </table>
 
-    <div id="statusBar">
-        向 Micro:bit 傳送指令: 無 | Cooldown: 0.0s
+        <div class="msg-log">
+            📤 傳送至 Micro:bit：<span id="msgSent">無</span>
+            <div class="cooldown-text" id="cooldownText">冷卻時間: 0.0s</div>
+        </div>
     </div>
 
     <script>
-        // --- 變數初始化 ---
-        const classes = ['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Background'];
+        // === 變數初始化 ===
+        const classes = [
+            { id: 'Class 1', name: 'Class 1 (渠管)' },
+            { id: 'Class 2', name: 'Class 2 (裂縫)' },
+            { id: 'Class 3', name: 'Class 3 (污泥)' },
+            { id: 'Class 4', name: 'Class 4 (樹葉)' },
+            { id: 'Background', name: '背景' }
+        ];
         let counts = { 'Class 1': 0, 'Class 2': 0, 'Class 3': 0, 'Class 4': 0, 'Background': 0 };
         
-        let video = document.getElementById('video');
+        const video = document.getElementById('webcam');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const flipBtn = document.getElementById('flipBtn');
+        const connectSerialBtn = document.getElementById('connectSerialBtn');
+        const msgSentSpan = document.getElementById('msgSent');
+        const cooldownText = document.getElementById('cooldownText');
+        
         let isFlipped = false;
         let isRecognizing = false;
+        let isModelReady = false;
         
+        let featureExtractor;
         let knn;
         let learnInterval;
-        let isVideoReady = false;
         
-        // Microbit Serial 變數
-        let port;
-        let writer;
+        // Microbit 通訊變數 (採用你提供的穩定寫法)
+        let serialPort = null;
+        let serialWriter = null;
         let lastSendTime = 0;
-        let currentCommand = "無";
         const cooldownMs = 1000;
 
-        // --- 初始化表格 ---
+        // === 初始化 UI 表格 ===
         function renderTable() {
             const tbody = document.getElementById('statsBody');
             tbody.innerHTML = '';
             classes.forEach(c => {
-                let displayName = c;
-                if(c === 'Class 1') displayName += ' (渠管)';
-                if(c === 'Class 2') displayName += ' (裂縫)';
-                if(c === 'Class 3') displayName += ' (污泥)';
-                if(c === 'Class 4') displayName += ' (樹葉)';
-                
                 tbody.innerHTML += `
                     <tr>
-                        <td>${displayName}</td>
-                        <td id="conf-${c.replace(' ', '')}">0%</td>
-                        <td id="count-${c.replace(' ', '')}">${counts[c]}</td>
+                        <td>${c.name}</td>
+                        <td id="conf-${c.id.replace(' ', '')}">0%</td>
+                        <td id="count-${c.id.replace(' ', '')}">${counts[c.id]}</td>
                     </tr>
                 `;
             });
+            // 初始禁用學習按鈕
+            setLearnButtonsDisabled(true);
         }
         renderTable();
 
-        // --- 設定鏡頭與 AI 模型 ---
-        // 這裡直接使用 KNN Classifier，不需要額外下載龐大的 MobileNet 特徵提取器
-        knn = ml5.KNNClassifier();
-
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => { 
-                video.srcObject = stream; 
-                // 確保影片開始播放後，才允許操作
-                video.onloadedmetadata = () => {
-                    video.play();
-                    isVideoReady = true;
-                    document.getElementById('loadingMsg').innerText = "✅ 系統準備就緒，請開始學習相片！";
-                    document.getElementById('toggleRecognize').innerText = "開始辨認";
-                    document.getElementById('toggleRecognize').disabled = false;
-                };
-            })
-            .catch(err => {
-                document.getElementById('loadingMsg').style.color = 'red';
-                document.getElementById('loadingMsg').innerText = "❌ 無法存取相機，請檢查瀏覽器權限！";
-                alert("相機存取失敗：" + err);
-            });
-
-        // --- UI 控制功能 ---
-        function flipVideo() {
-            isFlipped = !isFlipped;
-            video.style.transform = isFlipped ? 'scaleX(-1)' : 'scaleX(1)';
+        function setLearnButtonsDisabled(disabled) {
+            document.querySelectorAll('.learn-btn').forEach(btn => btn.disabled = disabled);
         }
 
-        function toggleRecognition() {
-            const btn = document.getElementById('toggleRecognize');
+        // === 1. 攝影機與 AI 模型設定 ===
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 400, height: 300 } });
+                video.srcObject = stream;
+            } catch (error) { 
+                alert("無法存取攝影機，請檢查瀏覽器權限。"); 
+            }
+        }
+        setupCamera();
+
+        // 初始化 ML5
+        featureExtractor = ml5.featureExtractor('MobileNet', () => {
+            isModelReady = true;
+            document.getElementById('loadingMsg').innerText = "✅ AI 模型準備就緒！可以開始長按右方按鈕學習。";
+            document.getElementById('loadingMsg').style.color = "#27ae60";
+            setLearnButtonsDisabled(false); // 啟用學習按鈕
+        });
+        knn = ml5.KNNClassifier();
+
+        // === 2. 按鈕控制邏輯 ===
+        flipBtn.addEventListener('click', () => {
+            isFlipped = !isFlipped;
+            video.style.transform = isFlipped ? 'scaleX(-1)' : 'scaleX(1)';
+        });
+
+        toggleBtn.addEventListener('click', () => {
             if (knn.getNumLabels() === 0) {
-                alert("請先長按右方黃色按鈕，為類別學習一些相片！");
+                alert("請先長按右方的按鈕，為類別學習一些相片！");
                 return;
             }
             isRecognizing = !isRecognizing;
             if (isRecognizing) {
-                btn.innerText = "停止辨認";
-                btn.style.backgroundColor = "#c0392b";
+                toggleBtn.innerHTML = "⏹ 停止辨認";
+                toggleBtn.classList.add("stop");
                 classify();
             } else {
-                btn.innerText = "開始辨認";
-                btn.style.backgroundColor = "var(--accent-color)";
-                // 重置相似度顯示
-                classes.forEach(c => updateConfidenceUI(c, 0));
+                toggleBtn.innerHTML = "▶ 開始辨認";
+                toggleBtn.classList.remove("stop");
+                // 歸零顯示
+                classes.forEach(c => updateConfidenceUI(c.id, 0));
             }
-        }
+        });
 
-        // --- 學習功能 (長按連拍) ---
+        // === 3. 學習功能 (長按連拍) ===
         function addExample(className) {
-            if (!isVideoReady) return;
-            // 直接將影片畫面作為特徵加入 KNN
-            knn.addExample(video, className);
+            if (!isModelReady) return;
+            const features = featureExtractor.infer(video);
+            knn.addExample(features, className);
             counts[className]++;
             document.getElementById(`count-${className.replace(' ', '')}`).innerText = counts[className];
         }
 
         function startLearning(className) {
-            if (!isVideoReady) {
-                alert("請等待相機畫面出現！");
-                return;
-            }
+            if (!isModelReady) return;
             addExample(className); // 按下立刻拍一張
-            learnInterval = setInterval(() => {
-                addExample(className);
-            }, 100); // 每 0.1 秒拍一張
+            learnInterval = setInterval(() => { addExample(className); }, 100); // 每 0.1 秒拍一張
         }
 
         function stopLearning() {
             clearInterval(learnInterval);
         }
 
-        // --- 辨認與模式邏輯 ---
+        // === 4. 辨認與模式邏輯 ===
         function classify() {
             if (!isRecognizing) return;
 
-            // 如果 KNN 模型還沒有任何學習資料，就停止辨識
-            if (knn.getNumLabels() === 0) {
-                isRecognizing = false;
-                document.getElementById('toggleRecognize').innerText = "開始辨認";
-                document.getElementById('toggleRecognize').style.backgroundColor = "var(--accent-color)";
-                return;
-            }
-
-            knn.classify(video, (err, result) => {
+            const features = featureExtractor.infer(video);
+            knn.classify(features, (err, result) => {
                 if (err) { console.error(err); return; }
 
                 let currentConfidences = result.confidencesByLabel;
                 
-                // 確保所有類別都有處理到 (即使某個類別還沒被學習過)
+                // 更新畫面上的相似度
                 classes.forEach(c => {
-                    let conf = currentConfidences[c] ? (currentConfidences[c] * 100).toFixed(1) : 0;
-                    updateConfidenceUI(c, conf);
+                    let conf = currentConfidences[c.id] ? (currentConfidences[c.id] * 100).toFixed(1) : 0;
+                    updateConfidenceUI(c.id, conf);
                 });
 
-                // 根據下拉選單模式篩選並觸發 Microbit
+                // 根據模式篩選
                 const mode = document.getElementById('modeSelect').value;
                 let allowedClasses = mode === 'inspect' ? ['Class 1', 'Class 2'] : ['Class 3', 'Class 4', 'Background'];
                 
@@ -319,52 +309,49 @@
                     }
                 });
 
-                // 如果有允許的類別且相似度大於 50%
+                // 若超過 50% 信心度，觸發傳送
                 if (bestClass && highestConf > 0.5) {
                     triggerMicrobit(bestClass);
                 }
 
-                // 循環辨認 (稍微加快辨識速度)
-                setTimeout(classify, 100);
+                // 循環辨認
+                setTimeout(classify, 150);
             });
         }
 
         function updateConfidenceUI(className, value) {
-            const el = document.getElementById(`conf-${className.replace(' ', '')}`);
-            if (el) el.innerText = `${value}%`;
+            document.getElementById(`conf-${className.replace(' ', '')}`).innerText = `${value}%`;
         }
 
-        // --- Microbit Serial 通訊 ---
-        async function connectSerial() {
-            if (!("serial" in navigator)) {
-                alert("你的瀏覽器不支援連接功能。請使用 Google Chrome 或 Edge 電腦版打開網頁。");
-                return;
-            }
+        // === 5. Web Serial API 通訊 (沿用你的穩定寫法) ===
+        connectSerialBtn.addEventListener('click', async () => {
+            if (!('serial' in navigator)) { alert("瀏覽器不支援 Web Serial API"); return; }
             try {
-                port = await navigator.serial.requestPort();
-                await port.open({ baudRate: 115200 }); // Microbit 預設 Baud Rate
-                writer = port.writable.getWriter();
-                document.getElementById('connectBtn').innerText = "Microbit 已連接";
-                document.getElementById('connectBtn').style.backgroundColor = "#2ecc71";
-            } catch (e) {
-                console.error(e);
-                alert("連接取消或失敗：" + e.message);
+                serialPort = await navigator.serial.requestPort();
+                await serialPort.open({ baudRate: 115200 });
+                
+                const textEncoder = new TextEncoderStream();
+                textEncoder.readable.pipeTo(serialPort.writable);
+                serialWriter = textEncoder.writable.getWriter();
+                
+                connectSerialBtn.innerText = "Micro:bit 已連接 ✅";
+                connectSerialBtn.disabled = true;
+            } catch (error) { 
+                console.error("連接序列埠失敗:", error); 
+                alert("連接失敗或被取消！");
             }
-        }
+        });
 
         async function sendToMicrobit(text) {
-            if (!writer) return;
-            try {
-                const data = new TextEncoder().encode(text + "\r\n");
-                await writer.write(data);
-            } catch (e) {
-                console.error("傳送失敗:", e);
+            if (serialWriter) {
+                try { await serialWriter.write(text + "\n"); } 
+                catch (error) { console.error("寫入失敗:", error); }
             }
         }
 
         function triggerMicrobit(className) {
             const now = Date.now();
-            if (now - lastSendTime < cooldownMs) return; // Cooldown 檢查
+            if (now - lastSendTime < cooldownMs) return; // 冷卻機制
 
             let cmd = "";
             if (className === 'Class 1') cmd = "R1";
@@ -375,21 +362,22 @@
 
             if (cmd) {
                 sendToMicrobit(cmd);
+                msgSentSpan.innerText = cmd;
                 lastSendTime = now;
-                currentCommand = cmd;
             }
         }
 
-        // --- 更新底部狀態列 (每 100ms) ---
+        // === 6. 更新冷卻時間顯示 ===
         setInterval(() => {
             const now = Date.now();
-            let remaining = 0;
             if (now - lastSendTime < cooldownMs) {
-                remaining = ((cooldownMs - (now - lastSendTime)) / 1000).toFixed(1);
+                let remaining = ((cooldownMs - (now - lastSendTime)) / 1000).toFixed(1);
+                cooldownText.innerText = `冷卻中: ${remaining}s`;
+                cooldownText.style.color = "#e74c3c";
             } else {
-                currentCommand = "無"; // Cooldown 結束後重置顯示
+                cooldownText.innerText = "就緒";
+                cooldownText.style.color = "#27ae60";
             }
-            document.getElementById('statusBar').innerText = `向 Micro:bit 傳送指令: ${currentCommand} | Cooldown: ${remaining}s`;
         }, 100);
 
     </script>
