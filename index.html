@@ -19,7 +19,7 @@
             text-align: center;
             margin: 0;
             padding: 20px;
-            user-select: none; /* 防止小學生狂按時選取到文字 */
+            user-select: none;
         }
         h1 {
             font-size: 2.5em;
@@ -45,22 +45,14 @@
             transition: 0.2s;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        button:hover, select:hover {
-            background-color: #2980b9;
-        }
-        button:active {
-            transform: translateY(2px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        #connectBtn {
-            background-color: #27ae60;
-        }
-        #connectBtn:hover {
-            background-color: #2ecc71;
-        }
-        #toggleRecognize {
-            background-color: var(--accent-color);
-        }
+        button:hover, select:hover { background-color: #2980b9; }
+        button:active { transform: translateY(2px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        button:disabled { background-color: #95a5a6; cursor: not-allowed; transform: none; box-shadow: none; }
+        
+        #connectBtn { background-color: #27ae60; }
+        #connectBtn:hover { background-color: #2ecc71; }
+        #toggleRecognize { background-color: var(--accent-color); }
+        
         .main-content {
             display: flex;
             justify-content: center;
@@ -79,7 +71,7 @@
             position: relative;
         }
         #loadingMsg {
-            color: #e74c3c; 
+            color: #27ae60; 
             font-weight: bold; 
             font-size: 1.2em;
             margin-bottom: 10px;
@@ -87,7 +79,7 @@
         video {
             background-color: #000;
             border-radius: 8px;
-            transform: scaleX(1); /* 預設不翻轉 */
+            transform: scaleX(1); 
         }
         .learning-panel {
             display: flex;
@@ -99,9 +91,7 @@
             background-color: #f39c12;
             width: 220px;
         }
-        .learning-panel button:active {
-            background-color: #e67e22;
-        }
+        .learning-panel button:active { background-color: #e67e22; }
         table {
             margin: 30px auto;
             border-collapse: collapse;
@@ -111,18 +101,11 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.05);
             border-radius: 8px;
             overflow: hidden;
-            margin-bottom: 60px; /* 留空間給底部的狀態列 */
+            margin-bottom: 60px;
         }
-        th, td {
-            padding: 12px 15px;
-            border: 1px solid #ddd;
-            text-align: center;
-            font-size: 1.1em;
-        }
-        th {
-            background-color: var(--primary-color);
-            color: white;
-        }
+        th, td { padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-size: 1.1em; }
+        th { background-color: var(--primary-color); color: white; }
+        
         #statusBar {
             position: fixed;
             bottom: 0;
@@ -151,13 +134,13 @@
     </div>
 
     <div class="control-panel">
-        <button id="toggleRecognize" onclick="toggleRecognition()">開始辨認</button>
+        <button id="toggleRecognize" onclick="toggleRecognition()" disabled>等待鏡頭準備...</button>
         <button id="flipCamera" onclick="flipVideo()">水平翻轉影像</button>
     </div>
 
     <div class="main-content">
         <div class="video-container">
-            <div id="loadingMsg">🔄 AI 模型載入中，請稍候...</div>
+            <div id="loadingMsg">請允許瀏覽器使用相機 📷</div>
             <video id="video" width="400" height="300" autoplay playsinline></video>
         </div>
 
@@ -183,7 +166,7 @@
     </table>
 
     <div id="statusBar">
-        傳送指令: 無 | Cooldown: 0.0s
+        向 Micro:bit 傳送指令: 無 | Cooldown: 0.0s
     </div>
 
     <script>
@@ -195,9 +178,9 @@
         let isFlipped = false;
         let isRecognizing = false;
         
-        let featureExtractor;
         let knn;
         let learnInterval;
+        let isVideoReady = false;
         
         // Microbit Serial 變數
         let port;
@@ -229,18 +212,26 @@
         renderTable();
 
         // --- 設定鏡頭與 AI 模型 ---
+        // 這裡直接使用 KNN Classifier，不需要額外下載龐大的 MobileNet 特徵提取器
+        knn = ml5.KNNClassifier();
+
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(stream => { 
                 video.srcObject = stream; 
+                // 確保影片開始播放後，才允許操作
+                video.onloadedmetadata = () => {
+                    video.play();
+                    isVideoReady = true;
+                    document.getElementById('loadingMsg').innerText = "✅ 系統準備就緒，請開始學習相片！";
+                    document.getElementById('toggleRecognize').innerText = "開始辨認";
+                    document.getElementById('toggleRecognize').disabled = false;
+                };
             })
-            .catch(err => alert("無法存取相機，請檢查瀏覽器權限設定：" + err));
-
-        // 載入 MobileNet 特徵提取器與 KNN
-        featureExtractor = ml5.featureExtractor('MobileNet', () => {
-            document.getElementById('loadingMsg').style.display = 'none';
-            console.log('MobileNet 模型載入完成！');
-        });
-        knn = ml5.KNNClassifier();
+            .catch(err => {
+                document.getElementById('loadingMsg').style.color = 'red';
+                document.getElementById('loadingMsg').innerText = "❌ 無法存取相機，請檢查瀏覽器權限！";
+                alert("相機存取失敗：" + err);
+            });
 
         // --- UI 控制功能 ---
         function flipVideo() {
@@ -269,16 +260,16 @@
 
         // --- 學習功能 (長按連拍) ---
         function addExample(className) {
-            const features = featureExtractor.infer(video);
-            knn.addExample(features, className);
+            if (!isVideoReady) return;
+            // 直接將影片畫面作為特徵加入 KNN
+            knn.addExample(video, className);
             counts[className]++;
             document.getElementById(`count-${className.replace(' ', '')}`).innerText = counts[className];
         }
 
         function startLearning(className) {
-            // 防止載入完成前就按下按鈕報錯
-            if (!featureExtractor || !featureExtractor.hasAnyTrainedClass && document.getElementById('loadingMsg').style.display !== 'none') {
-                alert("請等待 AI 模型載入完成！");
+            if (!isVideoReady) {
+                alert("請等待相機畫面出現！");
                 return;
             }
             addExample(className); // 按下立刻拍一張
@@ -295,12 +286,20 @@
         function classify() {
             if (!isRecognizing) return;
 
-            const features = featureExtractor.infer(video);
-            knn.classify(features, (err, result) => {
+            // 如果 KNN 模型還沒有任何學習資料，就停止辨識
+            if (knn.getNumLabels() === 0) {
+                isRecognizing = false;
+                document.getElementById('toggleRecognize').innerText = "開始辨認";
+                document.getElementById('toggleRecognize').style.backgroundColor = "var(--accent-color)";
+                return;
+            }
+
+            knn.classify(video, (err, result) => {
                 if (err) { console.error(err); return; }
 
-                // 更新相似度
                 let currentConfidences = result.confidencesByLabel;
+                
+                // 確保所有類別都有處理到 (即使某個類別還沒被學習過)
                 classes.forEach(c => {
                     let conf = currentConfidences[c] ? (currentConfidences[c] * 100).toFixed(1) : 0;
                     updateConfidenceUI(c, conf);
@@ -325,19 +324,20 @@
                     triggerMicrobit(bestClass);
                 }
 
-                // 循環辨認 (每 150 毫秒一次)
-                setTimeout(classify, 150);
+                // 循環辨認 (稍微加快辨識速度)
+                setTimeout(classify, 100);
             });
         }
 
         function updateConfidenceUI(className, value) {
-            document.getElementById(`conf-${className.replace(' ', '')}`).innerText = `${value}%`;
+            const el = document.getElementById(`conf-${className.replace(' ', '')}`);
+            if (el) el.innerText = `${value}%`;
         }
 
         // --- Microbit Serial 通訊 ---
         async function connectSerial() {
             if (!("serial" in navigator)) {
-                alert("你的瀏覽器不支援連接功能。請使用 Google Chrome 或 Edge 電腦版，並確保使用本機伺服器 (Localhost) 或 HTTPS 打開網頁。");
+                alert("你的瀏覽器不支援連接功能。請使用 Google Chrome 或 Edge 電腦版打開網頁。");
                 return;
             }
             try {
