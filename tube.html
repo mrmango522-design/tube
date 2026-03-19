@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>護渠大師</title>
+    <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --bg-color: #ecf0f1;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--primary-color);
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            user-select: none; /* 防止小學生狂按時選取到文字 */
+        }
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+        .control-panel {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            align-items: center;
+        }
+        button, select {
+            padding: 12px 20px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: var(--secondary-color);
+            color: white;
+            font-weight: bold;
+            transition: 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        button:hover, select:hover {
+            background-color: #2980b9;
+        }
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #connectBtn {
+            background-color: #27ae60;
+        }
+        #connectBtn:hover {
+            background-color: #2ecc71;
+        }
+        #toggleRecognize {
+            background-color: var(--accent-color);
+        }
+        .main-content {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .video-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        video {
+            background-color: #000;
+            border-radius: 8px;
+            margin: 15px 0;
+            transform: scaleX(1); /* 預設不翻轉 */
+        }
+        .learning-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            justify-content: center;
+        }
+        .learning-panel button {
+            background-color: #f39c12;
+            width: 220px;
+        }
+        .learning-panel button:active {
+            background-color: #e67e22;
+        }
+        table {
+            margin: 30px auto;
+            border-collapse: collapse;
+            width: 80%;
+            max-width: 800px;
+            background: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            text-align: center;
+            font-size: 1.1em;
+        }
+        th {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        #statusBar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 10px 0;
+            font-size: 1.2em;
+            font-weight: bold;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>護渠大師</h1>
+    
+    <div class="control-panel">
+        <button id="connectBtn" onclick="connectSerial()">連接Microbit</button>
+        <select id="modeSelect">
+            <option value="inspect">檢視模式 (Class 1-2)</option>
+            <option value="clear">清除模式 (Class 3-4, 背景)</option>
+        </select>
+    </div>
+
+    <div class="control-panel">
+        <button id="toggleRecognize" onclick="toggleRecognition()">開始辨認</button>
+        <button id="flipCamera" onclick="flipVideo()">水平翻轉影像</button>
+    </div>
+
+    <div class="main-content">
+        <div class="video-container">
+            <div id="loadingMsg" style="color: #e74c3c; font-weight: bold;">AI 模型載入中，請稍候...</div>
+            <video id="video" width="400" height="300" autoplay playsinline></video>
+        </div>
+
+        <div class="learning-panel">
+            <button onmousedown="startLearning('Class 1')" onmouseup="stopLearning()" onmouseleave="stopLearning()" ontouchstart="startLearning('Class 1')" ontouchend="stopLearning()">學習Class 1(渠管)</button>
+            <button onmousedown="startLearning('Class 2')" onmouseup="stopLearning()" onmouseleave="stopLearning()" ontouchstart="startLearning('Class 2')" ontouchend="stopLearning()">學習Class 2(裂縫)</button>
+            <button onmousedown="startLearning('Class 3')" onmouseup="stopLearning()" onmouseleave="stopLearning()" ontouchstart="startLearning('Class 3')" ontouchend="stopLearning()">學習Class 3(污泥)</button>
+            <button onmousedown="startLearning('Class 4')" onmouseup="stopLearning()" onmouseleave="stopLearning()" ontouchstart="startLearning('Class 4')" ontouchend="stopLearning()">學習Class 4(樹葉)</button>
+            <button onmousedown="startLearning('Background')" onmouseup="stopLearning()" onmouseleave="stopLearning()" ontouchstart="startLearning('Background')" ontouchend="stopLearning()">學習背景</button>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>類別 (Class)</th>
+                <th>相似度 (%)</th>
+                <th>已學習相片數量</th>
+            </tr>
+        </thead>
+        <tbody id="statsBody">
+            </tbody>
+    </table>
+
+    <div id="statusBar">
+        傳送指令: 無 | Cooldown: 0.0s
+    </div>
+
+    <script>
+        // --- 變數初始化 ---
+        const classes = ['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Background'];
+        let counts = { 'Class 1': 0, 'Class 2': 0, 'Class 3': 0, 'Class 4': 0, 'Background': 0 };
+        let confidences = { 'Class 1': 0, 'Class 2': 0, 'Class 3': 0, 'Class 4': 0, 'Background': 0 };
+        
+        let video = document.getElementById('video');
+        let isFlipped = false;
+        let isRecognizing = false;
+        
+        let featureExtractor;
+        let knn;
+        let learnInterval;
+        
+        // Microbit Serial 變數
+        let port;
+        let writer;
+        let lastSendTime = 0;
+        let currentCommand = "無";
+        const cooldownMs = 1000;
+
+        // --- 初始化表格 ---
+        function renderTable() {
+            const tbody = document.getElementById('statsBody');
+            tbody.innerHTML = '';
+            classes.forEach(c => {
+                let displayName = c;
+                if(c === 'Class 1') displayName += ' (渠管)';
+                if(c === 'Class 2') displayName += ' (裂縫)';
+                if(c === 'Class 3') displayName += ' (污泥)';
+                if(c === 'Class 4') displayName += ' (樹葉)';
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${displayName}</td>
+                        <td id="conf-${c.replace(' ', '')}">0%</td>
+                        <td id="count-${c.replace(' ', '')}">${counts[c]}</td>
+                    </tr>
+                `;
+            });
+        }
+        renderTable();
+
+        // --- 設定鏡頭與 AI 模型 ---
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => { video.srcObject = stream; })
+            .catch(err => alert("無法存取相機：" + err));
+
+        // 載入 MobileNet 特徵提取器與 KNN
+        featureExtractor = ml5.featureExtractor('MobileNet', () => {
+            document.getElementById('loadingMsg').style.display = 'none';
+            console.log('MobileNet 模型載入完成');
+        });
+        knn = ml5.KNNClassifier();
+
+        // --- UI 控制功能 ---
+        function flipVideo() {
+            isFlipped = !isFlipped;
+            video.style.transform = isFlipped ? 'scaleX(-1)' : 'scaleX(1)';
+        }
+
+        function toggleRecognition() {
+            const btn = document.getElementById('toggleRecognize');
+            if (knn.getNumLabels() === 0) {
+                alert("請先長按右方按鈕學習一些相片！");
+                return;
+            }
+            isRecognizing = !isRecognizing;
+            if (isRecognizing) {
+                btn.innerText = "停止辨認";
+                btn.style.backgroundColor = "#c0392b";
+                classify();
+            } else {
+                btn.innerText = "開始辨認";
+                btn.style.backgroundColor = "var(--accent-color)";
+                // 重置相似度顯示
+                classes.forEach(c => updateConfidenceUI(c, 0));
+            }
+        }
+
+        // --- 學習功能 (長按連拍) ---
+        function addExample(className) {
+            const features = featureExtractor.infer(video);
+            knn.addExample(features, className);
+            counts[className]++;
+            document.getElementById(`count-${className.replace(' ', '')}`).innerText = counts[className];
+        }
+
+        function startLearning(className) {
+            addExample(className); // 按下立刻拍一張
+            learnInterval = setInterval(() => {
+                addExample(className);
+            }, 100); // 每 0.1 秒拍一張
+        }
+
+        function stopLearning() {
+            clearInterval(learnInterval);
+        }
+
+        // --- 辨認與模式邏輯 ---
+        function classify() {
+            if (!isRecognizing) return;
+
+            const features = featureExtractor.infer(video);
+            knn.classify(features, (err, result) => {
+                if (err) { console.error(err); return; }
+
+                // 更新相似度
+                let currentConfidences = result.confidencesByLabel;
+                classes.forEach(c => {
+                    let conf = currentConfidences[c] ? (currentConfidences[c] * 100).toFixed(1) : 0;
+                    updateConfidenceUI(c, conf);
+                });
+
+                // 根據模式篩選並觸發 Microbit
+                const mode = document.getElementById('modeSelect').value;
+                let allowedClasses = mode === 'inspect' ? ['Class 1', 'Class 2'] : ['Class 3', 'Class 4', 'Background'];
+                
+                let bestClass = '';
+                let highestConf = 0;
+
+                allowedClasses.forEach(c => {
+                    if (currentConfidences[c] && currentConfidences[c] > highestConf) {
+                        highestConf = currentConfidences[c];
+                        bestClass = c;
+                    }
+                });
+
+                // 如果有允許的類別且相似度大於一定閾值 (例如 50%)
+                if (bestClass && highestConf > 0.5) {
+                    triggerMicrobit(bestClass);
+                }
+
+                // 循環辨認
+                setTimeout(classify, 150);
+            });
+        }
+
+        function updateConfidenceUI(className, value) {
+            document.getElementById(`conf-${className.replace(' ', '')}`).innerText = `${value}%`;
+        }
+
+        // --- Microbit Serial 通訊 ---
+        async function connectSerial() {
+            if (!("serial" in navigator)) {
+                alert("你的瀏覽器不支援 Web Serial API。請使用 Google Chrome 或 Edge 電腦版，並確保網站使用 HTTPS 或 Localhost。");
+                return;
+            }
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 115200 }); // Microbit 預設 Baud Rate
+                writer = port.writable.getWriter();
+                document.getElementById('connectBtn').innerText = "Microbit 已連接";
+                document.getElementById('connectBtn').style.backgroundColor = "#2ecc71";
+            } catch (e) {
+                console.error(e);
+                alert("連接取消或失敗：" + e.message);
+            }
+        }
+
+        async function sendToMicrobit(text) {
+            if (!writer) return;
+            const data = new TextEncoder().encode(text + "\r\n");
+            await writer.write(data);
+        }
+
+        function triggerMicrobit(className) {
+            const now = Date.now();
+            if (now - lastSendTime < cooldownMs) return; // Cooldown 檢查
+
+            let cmd = "";
+            if (className === 'Class 1') cmd = "R1";
+            else if (className === 'Class 2') cmd = "R2";
+            else if (className === 'Class 3') cmd = "R3";
+            else if (className === 'Class 4') cmd = "R4";
+            else if (className === 'Background') cmd = "Background";
+
+            if (cmd) {
+                sendToMicrobit(cmd);
+                lastSendTime = now;
+                currentCommand = cmd;
+            }
+        }
+
+        // --- 更新狀態列 (每 100ms) ---
+        setInterval(() => {
+            const now = Date.now();
+            let remaining = 0;
+            if (now - lastSendTime < cooldownMs) {
+                remaining = ((cooldownMs - (now - lastSendTime)) / 1000).toFixed(1);
+            }
+            document.getElementById('statusBar').innerText = `傳送指令: ${currentCommand} | Cooldown: ${remaining}s`;
+        }, 100);
+
+    </script>
+</body>
+</html>
